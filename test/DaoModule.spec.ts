@@ -31,6 +31,7 @@ const EIP712_TYPES = {
 
 const INVALIDATED_STATE = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 const ZERO_STATE = "0x0000000000000000000000000000000000000000000000000000000000000000";
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 describe("DaoModule", async () => {
 
@@ -54,26 +55,36 @@ describe("DaoModule", async () => {
     const setupTestWithMockExecutor = deployments.createFixture(async () => {
         const base = await baseSetup();
         const Module = await hre.ethers.getContractFactory("DaoModule");
-        const module = await Module.deploy(base.mock.address, base.mock.address, 42, 23, 0, 0, 1337);
+        const module = await Module.deploy(ZERO_ADDRESS, ZERO_ADDRESS, 42, 23, 0, 0, 1337);
+        await module.setUp(base.mock.address, base.mock.address, 42, 23, 0, 0, 1337)
         return { ...base, Module, module };
     })
     const [user1] = waffle.provider.getWallets();
 
-    describe("constructor", async () => {
+
+    describe("setUp", async () => {
+        it("throws if is already initialized", async () => {
+            const Module = await hre.ethers.getContractFactory("DaoModule")
+            const module = await Module.deploy(user1.address, user1.address, 42, 23, 0, 0, 1337)
+            await expect(
+                module.setUp(user1.address, user1.address, 0, 0, 0, 0, 0)
+            ).to.be.revertedWith("Module is already initialized")
+        })
+
         it("throws if timeout is 0", async () => {
             const Module = await hre.ethers.getContractFactory("DaoModule")
             await expect(
-                Module.deploy(user1.address, user1.address, 0, 0, 0, 0, 0)
+                Module.deploy(user1.address, user1.address, 0, 10, 100, 100, 1)
             ).to.be.revertedWith("Timeout has to be greater 0")
         })
-
+            
         it("throws if not enough time between cooldown and expiration", async () => {
             const Module = await hre.ethers.getContractFactory("DaoModule")
             await expect(
                 Module.deploy(user1.address, user1.address, 1, 0, 59, 0, 0)
             ).to.be.revertedWith("There need to be at least 60s between end of cooldown and expiration")
         })
-
+            
         it("answer expiration can be 0", async () => {
             const Module = await hre.ethers.getContractFactory("DaoModule")
             await Module.deploy(user1.address, user1.address, 1, 10, 0, 0, 0)
